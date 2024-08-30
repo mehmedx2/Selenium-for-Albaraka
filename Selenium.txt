@@ -1,0 +1,194 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/POM/4.0.0">
+		 
+		 
+
+
+package com.example.pages;
+
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
+
+public class DriverManager {
+    private static WebDriver driver;
+
+    public static WebDriver getDriver() {
+        if (driver == null) {
+            System.setProperty("webdriver.chrome.driver", "path/to/chromedriver");
+            driver = new ChromeDriver();
+        }
+        return driver;
+    }
+
+    public static void quitDriver() {
+        if (driver != null) {
+            driver.quit();
+            driver = null;
+        }
+    }
+}
+
+package com.example.pages;
+
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.support.PageFactory;
+
+public abstract class BasePage {
+    protected WebDriver driver;
+
+    public BasePage() {
+        this.driver = DriverManager.getDriver();
+        PageFactory.initElements(driver, this);
+    }
+}
+
+package com.example.pages;
+
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.FindBy;
+import org.openqa.selenium.support.ui.Select;
+import org.openqa.selenium.By;
+
+public class HomePage extends BasePage {
+    @FindBy(id = "search-box")
+    private WebElement searchBox;
+
+    @FindBy(id = "search-button")
+    private WebElement searchButton;
+
+    @FindBy(id = "sort-dropdown")
+    private WebElement sortDropdown;
+
+    @FindBy(id = "in-stock-filter")
+    private WebElement inStockFilter;
+
+    @FindBy(xpath = "//button[text()='Next']")
+    private WebElement nextPageButton;
+
+    @FindBy(xpath = "//div[@class='product-item'][3]")
+    private WebElement thirdProduct;
+
+    public void searchFor(String keyword) {
+        searchBox.sendKeys(keyword);
+        searchButton.click();
+    }
+
+    public void sortAlphabetically() {
+        Select sortSelect = new Select(sortDropdown);
+        sortSelect.selectByVisibleText("Alfabetik");
+    }
+
+    public void filterInStock() {
+        inStockFilter.click();
+    }
+
+    public void goToNextPage() {
+        nextPageButton.click();
+    }
+
+    public ProductPage selectThirdProduct() {
+        thirdProduct.click();
+        return new ProductPage();
+    }
+}
+
+package com.example.pages;
+
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.FindBy;
+
+public class ProductPage extends BasePage {
+    @FindBy(id = "price")
+    private WebElement priceElement;
+
+    @FindBy(id = "add-to-cart")
+    private WebElement addToCartButton;
+
+    public String getProductPrice() {
+        return priceElement.getText();
+    }
+
+    public void addToCart() {
+        addToCartButton.click();
+    }
+}
+package com.example.pages;
+
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.FindBy;
+
+public class CartPage extends BasePage {
+    @FindBy(id = "cart-quantity")
+    private WebElement quantityField;
+
+    @FindBy(id = "cart-total")
+    private WebElement totalPriceElement;
+
+    @FindBy(id = "clear-cart")
+    private WebElement clearCartButton;
+
+    public void setQuantity(int quantity) {
+        quantityField.clear();
+        quantityField.sendKeys(String.valueOf(quantity));
+    }
+
+    public String getTotalPrice() {
+        return totalPriceElement.getText();
+    }
+
+    public void clearCart() {
+        clearCartButton.click();
+    }
+}
+package com.example.tests;
+
+import com.example.pages.CartPage;
+import com.example.pages.HomePage;
+import com.example.pages.ProductPage;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+
+public class BookStoreTest {
+    private HomePage homePage;
+    private ProductPage productPage;
+    private CartPage cartPage;
+
+    @BeforeClass
+    public void setUp() {
+        DriverManager.getDriver().get("http://kitapyurdu.com");
+        homePage = new HomePage();
+    }
+
+    @Test
+    public void testBookFlow() {
+        homePage.searchFor("Sabahattin Ali");
+        homePage.sortAlphabetically();
+        homePage.filterInStock();
+        homePage.goToNextPage();
+        productPage = homePage.selectThirdProduct();
+
+        String productPrice = productPage.getProductPrice();
+        productPage.addToCart();
+
+        cartPage = new CartPage();
+        cartPage.setQuantity(2);
+
+        double price = Double.parseDouble(productPrice.replace("₺", "").trim());
+        double totalPrice = Double.parseDouble(cartPage.getTotalPrice().replace("₺", "").trim());
+
+        Assert.assertEquals(totalPrice, price * 2, "Total price should be double the product price.");
+
+        cartPage.clearCart();
+
+        // Assume there's a method to check if cart is empty
+        // Assert.assertTrue(cartPage.isCartEmpty(), "Cart should be empty.");
+    }
+
+    @AfterClass
+    public void tearDown() {
+        DriverManager.quitDriver();
+    }
+}
